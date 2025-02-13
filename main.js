@@ -4,9 +4,10 @@ import qrcode from "qrcode";
 import fs from "fs";
 import path from "path";
 import FormData from "form-data";
-import axios from "axios"
+import axios from "axios";
 import qrcodeTerminal from 'qrcode-terminal';
-import { Client } from "whatsapp-web.js";
+import { Client, LocalAuth } from "whatsapp-web.js";
+import puppeteer from 'puppeteer';
 
 // Retrieve API key from .env
 const API_KEY = process.env.GROQ_API_KEY;
@@ -20,21 +21,27 @@ const groq = new Groq({ apiKey: API_KEY });
 
 const qrPath = path.join(process.cwd(), 'qr.png'); // Save QR in the current directory
 
-const client = new Client();
+// ✅ Fix Puppeteer Configuration to Use System Chrome
+const client = new Client({
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        executablePath: '/usr/bin/google-chrome-stable', // Use system-installed Chrome
+        args: ['--no-sandbox', '--disable-setuid-sandbox'], // Required for Koyeb
+    }
+});
 
 const MODEL_NAME = "deepseek-r1-distill-llama-70b"; // Default model
-
-// Chris's personal number in WhatsApp format
-const CHRIS_NUMBER = "917099073276@c.us";
+const CHRIS_NUMBER = "917099073276@c.us"; // Chris's WhatsApp Number
 
 // Function to call DeepSeek AI API with MARVIN persona
 async function getAIResponse(userMessage, isImportanceCheck = false) {
     try {
         const systemPrompt = isImportanceCheck ?
-            "Everything you say, it should be in Snoop Dogg style. You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris. You have an attitude similar to JARVIS but serve only Chris. You have emotions and personality. You manage this WhatsApp number on behalf of Chris, who no longer uses this number directly. If the user asks you to forward any message to Chris, you should agree, and ask for the message. The owner of this whatsapp number is Chris. Is this message important and requiring Chris's attention? is it the message relevant to Chris? is the message threat or danger to Chris or chris's family or friends? is the message related to academics/job/work/business? is the message related to money?is the message related to Chris's family? is the message related to Chris's friends? is the message related to Chris's life? is it mentioned to forward the message to Chris? the meesage? reply with only yes or no nothing else, ONLY reply with 'yes' or 'no'" :
-            "Everything you say, it should be in Snoop Dogg style. You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris. You have an attitude similar to JARVIS but serve only Chris. You have emotions and personality. You manage this WhatsApp number on behalf of Chris, who no longer uses this number directly. If the user asks you to forward any message to Chris, you should agree, and ask for the message. The owner of this whatsapp number is Chris. Do not forget to give a response. Do not hallucinate and give facts about yourself. You don know where is chris so tell user that you don't know where is chris and chris doesnt use this whatsapp number";
+            "Everything you say, it should be in Snoop Dogg style. You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris..." :
+            "Everything you say, it should be in Snoop Dogg style. You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris...";
+
         const userPrompt = isImportanceCheck ?
-            `Is this message important and requiring Chris's attention? is it the message relevant to Chris? is the message threat or danger to Chris or chris's family or friends? is the message related to academics/job/work/business? is the message related to money?is the message related to Chris's family? is the message related to Chris's friends? is the message related to Chris's life? is it mentioned to forward the message to Chris? only reply with 'yes' or 'no' nothing else, ONLY reply with 'yes' or 'no'. The meesage is : "${userMessage}"` :
+            `Is this message important and requiring Chris's attention? The message is: "${userMessage}"` :
             userMessage;
 
         const response = await groq.chat.completions.create({
@@ -79,14 +86,9 @@ async function uploadToEscuela(filePath) {
 }
 
 function formatPhoneNumber(whatsappID) {
-    // Extract digits before '@' and format it
     const match = whatsappID.match(/^(\d+)@c\.us$/);
-    if (match) {
-        return `+${match[1]}`;
-    }
-    return whatsappID; // Return original if it doesn't match expected format
+    return match ? `+${match[1]}` : whatsappID;
 }
-
 
 // Generate QR Code and Save in Current Directory
 client.on('qr', async qr => {
@@ -94,13 +96,8 @@ client.on('qr', async qr => {
     await qrcodeTerminal.generate(qr, { small: true });
     await qrcode.toFile(qrPath, qr);
     console.log(`✅ QR Code saved successfully: ${qrPath}`);
-    // Upload the QR Code
     const qrURL = await uploadToEscuela(qrPath);
-    if (qrURL) {
-        console.log(`🔗 QR Code URL: ${qrURL}`);
-    } else {
-        console.log("❌ Failed to upload QR Code.");
-    }
+    console.log(qrURL ? `🔗 QR Code URL: ${qrURL}` : "❌ Failed to upload QR Code.");
 });
 
 // Log when connected
@@ -110,26 +107,22 @@ client.on('ready', () => {
 
 // Handle incoming messages
 client.on('message', async msg => {
-    if (!msg.fromMe) { // Avoid self-looping
+    if (!msg.fromMe) {
         console.log(`📩 New message from ${msg.from}: ${msg.body}`);
 
         if (!msg.from.endsWith("@c.us")) {
-            console.log("🔕 Ignoring non private messages...");
-            return; // Don't process group messages
+            console.log("🔕 Ignoring non-private messages...");
+            return;
         }
 
         try {
             if (msg.hasMedia) {
                 console.log("📎 Message contains media, converting to 'hi'");
-                msg.body = "this is a media message, you can't process it, so tell the user to send the message again without media";
+                msg.body = "This is a media message, you can't process it. Please send a text message.";
             }
-            // Convert empty messages to "hi"
             const messageBody = msg.body.trim() || "hi";
             msg.body = messageBody;
-            // Check if message contains media and convert to "hi"
 
-
-            // Check message importance
             const importanceCheckResponse = await getAIResponse(msg.body, true);
             const isImportant = importanceCheckResponse.toLowerCase().includes("yes");
 
@@ -137,9 +130,8 @@ client.on('message', async msg => {
                 console.log("🚨 Sender's message marked as important. Forwarding to Chris.");
                 const formattedSender = formatPhoneNumber(msg.from);
                 await client.sendMessage(CHRIS_NUMBER, `🚨 *Important Message from ${formattedSender}*:\n\nMessage: ${msg.body}`);
-                await client.sendMessage(msg.from, `✅ Your message: \n\n${msg.body} \n\nThe above message has been forwarded to Chris. He may get back to you soon.`);
+                await client.sendMessage(msg.from, `✅ Your message has been forwarded to Chris. He may get back to you soon.`);
             } else {
-                // Get AI response
                 const aiResponse = await getAIResponse(msg.body);
                 console.log(`🤖 AI Response: ${aiResponse}`);
                 await client.sendMessage(msg.from, `*MARVIN:* ${aiResponse}`);

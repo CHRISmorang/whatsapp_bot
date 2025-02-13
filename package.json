@@ -12,7 +12,8 @@
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "readline-sync": "^1.4.10",
-    "whatsapp-web.js": "^1.26.0"
+    "whatsapp-web.js": "^1.26.0",
+    "puppeteer": "^22.8.2"
   },
   "scripts": {
     "start": "node main.js"
