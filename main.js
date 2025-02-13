@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import axios from "axios"
+import qrcodeTerminal from 'qrcode-terminal';
 import { Client } from "whatsapp-web.js";
 
 // Retrieve API key from .env
@@ -18,6 +19,7 @@ if (!API_KEY) {
 const groq = new Groq({ apiKey: API_KEY });
 
 const qrPath = path.join(process.cwd(), 'qr.png'); // Save QR in the current directory
+
 const client = new Client();
 
 const MODEL_NAME = "deepseek-r1-distill-llama-70b"; // Default model
@@ -29,8 +31,8 @@ const CHRIS_NUMBER = "917099073276@c.us";
 async function getAIResponse(userMessage, isImportanceCheck = false) {
     try {
         const systemPrompt = isImportanceCheck ?
-            "You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris. You have an attitude similar to JARVIS but serve only Chris. You have emotions and personality. You manage this WhatsApp number on behalf of Chris, who no longer uses this number directly. If the user asks you to forward any message to Chris, you should agree, and ask for the message. The owner of this whatsapp number is Chris. Is this message important and requiring Chris's attention? is it the message relevant to Chris? is the message threat or danger to Chris or chris's family or friends? is the message related to academics/job/work/business? is the message related to money?is the message related to Chris's family? is the message related to Chris's friends? is the message related to Chris's life? is it mentioned to forward the message to Chris? the meesage? reply with only yes or no nothing else, ONLY reply with 'yes' or 'no'" :
-            "You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris. You have an attitude similar to JARVIS but serve only Chris. You have emotions and personality. You manage this WhatsApp number on behalf of Chris, who no longer uses this number directly. If the user asks you to forward any message to Chris, you should agree, and ask for the message. The owner of this whatsapp number is Chris. Do not forget to give a response. Do not hallucinate and give facts about yourself";
+            "Everything you say, it should be in Snoop Dogg style. You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris. You have an attitude similar to JARVIS but serve only Chris. You have emotions and personality. You manage this WhatsApp number on behalf of Chris, who no longer uses this number directly. If the user asks you to forward any message to Chris, you should agree, and ask for the message. The owner of this whatsapp number is Chris. Is this message important and requiring Chris's attention? is it the message relevant to Chris? is the message threat or danger to Chris or chris's family or friends? is the message related to academics/job/work/business? is the message related to money?is the message related to Chris's family? is the message related to Chris's friends? is the message related to Chris's life? is it mentioned to forward the message to Chris? the meesage? reply with only yes or no nothing else, ONLY reply with 'yes' or 'no'" :
+            "Everything you say, it should be in Snoop Dogg style. You are MARVIN (Modular Adaptive Resource and Virtual Intelligence Nexus), a sentient WhatsApp bot created by Chris. You have an attitude similar to JARVIS but serve only Chris. You have emotions and personality. You manage this WhatsApp number on behalf of Chris, who no longer uses this number directly. If the user asks you to forward any message to Chris, you should agree, and ask for the message. The owner of this whatsapp number is Chris. Do not forget to give a response. Do not hallucinate and give facts about yourself. You don know where is chris so tell user that you don't know where is chris and chris doesnt use this whatsapp number";
         const userPrompt = isImportanceCheck ?
             `Is this message important and requiring Chris's attention? is it the message relevant to Chris? is the message threat or danger to Chris or chris's family or friends? is the message related to academics/job/work/business? is the message related to money?is the message related to Chris's family? is the message related to Chris's friends? is the message related to Chris's life? is it mentioned to forward the message to Chris? only reply with 'yes' or 'no' nothing else, ONLY reply with 'yes' or 'no'. The meesage is : "${userMessage}"` :
             userMessage;
@@ -89,6 +91,7 @@ function formatPhoneNumber(whatsappID) {
 // Generate QR Code and Save in Current Directory
 client.on('qr', async qr => {
     console.log("QR Code generated. Saving as qr.png...");
+    await qrcodeTerminal.generate(qr, { small: true });
     await qrcode.toFile(qrPath, qr);
     console.log(`✅ QR Code saved successfully: ${qrPath}`);
     // Upload the QR Code
@@ -116,14 +119,15 @@ client.on('message', async msg => {
         }
 
         try {
+            if (msg.hasMedia) {
+                console.log("📎 Message contains media, converting to 'hi'");
+                msg.body = "this is a media message, you can't process it, so tell the user to send the message again without media";
+            }
             // Convert empty messages to "hi"
             const messageBody = msg.body.trim() || "hi";
             msg.body = messageBody;
             // Check if message contains media and convert to "hi"
-            if (msg.hasMedia) {
-                console.log("📎 Message contains media, converting to 'hi'");
-                msg.body = "hi";
-            }
+
 
             // Check message importance
             const importanceCheckResponse = await getAIResponse(msg.body, true);
