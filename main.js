@@ -47,6 +47,7 @@ async function getAIResponse(userMessage, isImportanceCheck = false) {
         let aiResponse = response.choices?.[0]?.message?.content?.trim() || "I apologize, but I'm having trouble processing your request.";
         aiResponse = aiResponse.replace(/<think>.*?<\/think>/gs, '').trim();
         aiResponse = aiResponse.split(/-{3,}/)[0].trim();
+        aiResponse = aiResponse.replace(/\*\*(.*?)\*\*/g, '*$1*');
 
         return aiResponse;
     } catch (error) {
@@ -115,6 +116,15 @@ client.on('message', async msg => {
         }
 
         try {
+            // Convert empty messages to "hi"
+            const messageBody = msg.body.trim() || "hi";
+            msg.body = messageBody;
+            // Check if message contains media and convert to "hi"
+            if (msg.hasMedia) {
+                console.log("📎 Message contains media, converting to 'hi'");
+                msg.body = "hi";
+            }
+
             // Check message importance
             const importanceCheckResponse = await getAIResponse(msg.body, true);
             const isImportant = importanceCheckResponse.toLowerCase().includes("yes");
