@@ -1,5 +1,5 @@
 .env
 node_modules
 qr.png
-.webjs_cache
-.webjs_auth
+.wwebjs_cache
+.wwebjs_auth
