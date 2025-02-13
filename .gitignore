@@ -1,0 +1,5 @@
+.env
+node_modules
+qr.png
+.webjs_cache
+.webjs_auth
